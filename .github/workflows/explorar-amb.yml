@@ -9,6 +9,7 @@ jobs:
   explorar:
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -87,3 +88,29 @@ jobs:
           }
           JS
           node av.js
+      - name: Numeros de vehiculo por compania
+        run: |
+          cp datos/recorridos.gtfsdata datos/companias.json /tmp/d/
+          cd /tmp/d
+          cat > num.js <<'JS'
+          const G = require('gtfs-realtime-bindings').transit_realtime;
+          const fs = require('fs');
+          const rec = JSON.parse(fs.readFileSync('recorridos.gtfsdata'));
+          const comp = Object.fromEntries(JSON.parse(fs.readFileSync('companias.json')).map(c => [c.id, c.nombre]));
+          const o = G.FeedMessage.toObject(G.FeedMessage.decode(fs.readFileSync('trips.bin')), { longs: String });
+          const por = {};
+          for (const e of o.entity) {
+            const tu = e.tripUpdate; if (!tu) continue;
+            const rid = String(tu.trip.tripId).split('.')[0];
+            const l = rec[rid]; const op = l ? (comp[l.operador] || l.operador) : '¿ruta ' + rid + '?';
+            const x = por[op] = por[op] || { viajes: 0, sinVeh: 0, ej: [] };
+            x.viajes++;
+            if (!tu.vehicle) { x.sinVeh++; continue; }
+            if (x.ej.length < 6) x.ej.push((l ? l.codi : rid) + ': id ' + tu.vehicle.id + ' / etiqueta ' + tu.vehicle.label);
+          }
+          for (const [op, x] of Object.entries(por)) {
+            console.log('COMPANIA ' + op + ' | viajes ' + x.viajes + ' | sin vehiculo ' + x.sinVeh);
+            for (const s of x.ej) console.log('    ' + s);
+          }
+          JS
+          node num.js
