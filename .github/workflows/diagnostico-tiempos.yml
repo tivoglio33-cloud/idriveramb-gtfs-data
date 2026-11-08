@@ -1,0 +1,69 @@
+name: Diagnostico tiempos AMB
+
+# Baja trips.bin (tiempos en vivo del AMB) dos veces, con un minuto de
+# diferencia, y dice si la hora del archivo y los tiempos se renuevan.
+on:
+  workflow_dispatch:
+    inputs:
+      parada:
+        description: 'Codigo de parada a mirar'
+        default: '105495'
+
+jobs:
+  diagnostico:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Preparar
+        run: |
+          mkdir -p /tmp/d && cd /tmp/d && npm init -y >/dev/null && npm i gtfs-realtime-bindings >/dev/null
+          HOST="www.ambmobilitat.cat"
+          cp /etc/ssl/certs/ca-certificates.crt /tmp/cadena.pem
+          if ! curl -fsS -o /dev/null "https://$HOST/"; then
+            openssl s_client -connect "$HOST:443" -servername "$HOST" </dev/null 2>/dev/null | openssl x509 > /tmp/hoja.pem
+            AIA=$(openssl x509 -in /tmp/hoja.pem -noout -text | grep -o 'CA Issuers - URI:[^[:space:]]*' | head -1 | sed 's/.*URI://')
+            curl -fsSL -o /tmp/i.crt "$AIA"
+            openssl x509 -inform DER -in /tmp/i.crt -out /tmp/i.pem 2>/dev/null || cp /tmp/i.crt /tmp/i.pem
+            cat /tmp/i.pem >> /tmp/cadena.pem
+          fi
+      - name: Mirar dos veces
+        env:
+          PARADA: ${{ github.event.inputs.parada }}
+        run: |
+          cd /tmp/d
+          cat > mirar.js <<'JS'
+          const fs = require('fs');
+          const G = require('gtfs-realtime-bindings').transit_realtime;
+          const f = G.FeedMessage.decode(fs.readFileSync(process.argv[2]));
+          const ahora = Math.floor(Date.now() / 1000);
+          const ts = Number(f.header.timestamp || 0);
+          let tsMax = 0, conTs = 0, n = 0;
+          const id = String(process.env.PARADA).padStart(6, '0');
+          const enParada = [];
+          for (const e of f.entity) {
+            const tu = e.tripUpdate; if (!tu) continue; n++;
+            const t = Number(tu.timestamp || 0); if (t) { conTs++; if (t > tsMax) tsMax = t; }
+            for (const s of tu.stopTimeUpdate || []) {
+              if (String(s.stopId) === id || String(s.stopId) === process.env.PARADA) {
+                const tt = Number((s.arrival && s.arrival.time) || (s.departure && s.departure.time) || 0);
+                enParada.push(tu.trip.tripId.split('.')[0] + ' en ' + Math.round((tt - ahora) / 60) + ' min');
+              }
+            }
+          }
+          const hora = s => new Date(s * 1000).toLocaleTimeString('es-ES', { timeZone: 'Europe/Madrid' });
+          console.log('Hora ahora (Madrid):          ' + hora(ahora));
+          console.log('Hora del archivo (cabecera):  ' + (ts ? hora(ts) + '  -> hace ' + Math.round((ahora - ts) / 60) + ' min' : 'NO TIENE'));
+          console.log('Viajes en el archivo:         ' + n + '  (con hora propia: ' + conTs + ')');
+          console.log('Viaje mas reciente:           ' + (tsMax ? hora(tsMax) + '  -> hace ' + Math.round((ahora - tsMax) / 60) + ' min' : 'ninguno trae hora'));
+          console.log('Parada ' + process.env.PARADA + ':  ' + (enParada.join(' | ') || 'no sale'));
+          JS
+          for i in 1 2; do
+            echo "===== Descarga $i ====="
+            curl -fsS --cacert /tmp/cadena.pem -o trips$i.bin "https://www.ambmobilitat.cat/transit/trips-updates/trips.bin"
+            ls -la trips$i.bin | awk '{print "Tamano: " $5 " bytes"}'
+            node mirar.js trips$i.bin
+            [ $i = 1 ] && sleep 60
+          done
+          if cmp -s trips1.bin trips2.bin; then echo "RESULTADO: el archivo NO ha cambiado en 1 minuto"; else echo "RESULTADO: el archivo SI ha cambiado en 1 minuto"; fi
