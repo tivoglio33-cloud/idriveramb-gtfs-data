@@ -1,0 +1,70 @@
+name: Explorar datos en vivo del AMB
+
+# Busca si el AMB publica posiciones de los buses o numero de vehiculo
+# (calca). Mira por dentro trips.bin y prueba otras direcciones parecidas.
+on:
+  workflow_dispatch:
+
+jobs:
+  explorar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Preparar
+        run: |
+          mkdir -p /tmp/d && cd /tmp/d && npm init -y >/dev/null && npm i gtfs-realtime-bindings >/dev/null
+          HOST="www.ambmobilitat.cat"
+          cp /etc/ssl/certs/ca-certificates.crt /tmp/cadena.pem
+          openssl s_client -connect "$HOST:443" -servername "$HOST" </dev/null 2>/dev/null | openssl x509 > /tmp/hoja.pem
+          AIA=$(openssl x509 -in /tmp/hoja.pem -noout -text | grep -o 'CA Issuers - URI:[^[:space:]]*' | head -1 | sed 's/.*URI://')
+          curl -fsSL -o /tmp/i.crt "$AIA" && (openssl x509 -inform DER -in /tmp/i.crt -out /tmp/i.pem 2>/dev/null || cp /tmp/i.crt /tmp/i.pem) && cat /tmp/i.pem >> /tmp/cadena.pem
+      - name: Que trae trips.bin por dentro
+        run: |
+          cd /tmp/d
+          curl -fsS --cacert /tmp/cadena.pem -o trips.bin "https://www.ambmobilitat.cat/transit/trips-updates/trips.bin"
+          cat > ver.js <<'JS'
+          const G = require('gtfs-realtime-bindings').transit_realtime;
+          const f = G.FeedMessage.decode(require('fs').readFileSync('trips.bin'));
+          const o = G.FeedMessage.toObject(f, { longs: String });
+          console.log('Cabecera:', JSON.stringify(o.header));
+          const tipos = {}; let conVeh = 0, conPos = 0, conAlert = 0;
+          const camposTrip = new Set(), camposVeh = new Set();
+          for (const e of o.entity) {
+            for (const k of Object.keys(e)) tipos[k] = (tipos[k] || 0) + 1;
+            if (e.tripUpdate?.vehicle) { conVeh++; Object.keys(e.tripUpdate.vehicle).forEach(k => camposVeh.add(k)); }
+            if (e.tripUpdate?.trip) Object.keys(e.tripUpdate.trip).forEach(k => camposTrip.add(k));
+            if (e.vehicle) conPos++;
+            if (e.alert) conAlert++;
+          }
+          console.log('Tipos de entidad:', JSON.stringify(tipos));
+          console.log('Campos de trip:', [...camposTrip].join(', '));
+          console.log('Viajes con vehiculo:', conVeh, ' campos:', [...camposVeh].join(', '));
+          console.log('Entidades con posicion:', conPos, ' con aviso:', conAlert);
+          console.log('--- 3 ejemplos completos ---');
+          for (const e of o.entity.slice(0, 3)) {
+            const c = JSON.parse(JSON.stringify(e));
+            if (c.tripUpdate?.stopTimeUpdate) c.tripUpdate.stopTimeUpdate = c.tripUpdate.stopTimeUpdate.slice(0, 2);
+            console.log(JSON.stringify(c));
+          }
+          JS
+          node ver.js
+      - name: Probar otras direcciones
+        run: |
+          for u in \
+            transit/vehicle-positions/vehicles.bin \
+            transit/vehicle-positions/vehiclePositions.bin \
+            transit/vehicles-positions/vehicles.bin \
+            transit/vehiclepositions/vehiclepositions.bin \
+            transit/vehicle-positions.bin \
+            transit/vehicles.bin \
+            transit/positions.bin \
+            transit/service-alerts/alerts.bin \
+            transit/alerts/alerts.bin \
+            transit/trips-updates/ \
+            transit/ \
+            OpenData/ ; do
+            code=$(curl -s --cacert /tmp/cadena.pem -o /tmp/r -w '%{http_code} %{size_download} %{content_type}' "https://www.ambmobilitat.cat/$u")
+            echo "$code  <- $u"
+          done
