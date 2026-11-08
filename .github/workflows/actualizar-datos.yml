@@ -1,0 +1,57 @@
+name: Actualizar datos AMB
+
+# Descarga el GTFS del AMB, lo procesa con scripts/procesar.js y guarda
+# en la carpeta datos/ los archivos que usa la app iDriverAMB.
+# Solo hace commit si los datos han cambiado.
+
+on:
+  workflow_dispatch:        # boton "Run workflow" (y para cron-job.org mas adelante)
+  schedule:
+    - cron: '23 2 * * *'    # 03:23 / 04:23 hora de Madrid (segun invierno/verano)
+    - cron: '47 4 * * *'    # 05:47 / 06:47 de reserva (GitHub a veces se salta o retrasa)
+
+permissions:
+  contents: write
+
+concurrency:
+  group: actualizar-datos-amb
+  cancel-in-progress: false
+
+jobs:
+  actualizar:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar el repo
+        uses: actions/checkout@v4
+
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Descargar GTFS del AMB
+        run: |
+          set -e
+          curl -fsSL --retry 3 --retry-delay 10 -o /tmp/amb.zip \
+            "https://www.ambmobilitat.cat/OpenData/google_transit.zip"
+          ls -la /tmp/amb.zip
+          mkdir -p /tmp/gtfs
+          unzip -o -q /tmp/amb.zip -d /tmp/gtfs
+          echo "Archivos del GTFS:"
+          ls -la /tmp/gtfs
+
+      - name: Procesar
+        run: node scripts/procesar.js /tmp/gtfs datos
+
+      - name: Guardar si hay cambios
+        run: |
+          git config user.name "idriveramb-bot"
+          git config user.email "idriveramb-bot@users.noreply.github.com"
+          git add datos
+          # meta.json siempre cambia (lleva la hora). Solo cuenta si cambia algo mas.
+          if git diff --cached --quiet -- datos ':(exclude)datos/meta.json'; then
+            echo "Los datos no han cambiado: no se hace commit."
+          else
+            git commit -m "Datos AMB $(TZ=Europe/Madrid date '+%d/%m/%Y %H:%M')"
+            git push
+          fi
