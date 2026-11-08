@@ -32,8 +32,24 @@ jobs:
       - name: Descargar GTFS del AMB
         run: |
           set -e
-          curl -fsSL --retry 3 --retry-delay 10 -o /tmp/amb.zip \
-            "https://www.ambmobilitat.cat/OpenData/google_transit.zip"
+          HOST="www.ambmobilitat.cat"
+          URL="https://$HOST/OpenData/google_transit.zip"
+          if ! curl -fsSL --retry 3 --retry-delay 10 -o /tmp/amb.zip "$URL"; then
+            # El servidor del AMB no envia el certificado intermedio.
+            # Lo descargamos de la direccion que viene en su propio certificado
+            # (campo "CA Issuers") y reintentamos con el, sin quitar la seguridad.
+            echo "Certificado incompleto en $HOST: buscando el certificado intermedio..."
+            openssl s_client -connect "$HOST:443" -servername "$HOST" </dev/null 2>/dev/null \
+              | openssl x509 > /tmp/hoja.pem
+            AIA=$(openssl x509 -in /tmp/hoja.pem -noout -text \
+              | grep -o 'CA Issuers - URI:[^[:space:]]*' | head -1 | sed 's/.*URI://')
+            echo "Intermedio en: $AIA"
+            curl -fsSL -o /tmp/intermedio.crt "$AIA"
+            openssl x509 -inform DER -in /tmp/intermedio.crt -out /tmp/intermedio.pem 2>/dev/null \
+              || cp /tmp/intermedio.crt /tmp/intermedio.pem
+            cat /etc/ssl/certs/ca-certificates.crt /tmp/intermedio.pem > /tmp/cadena.pem
+            curl -fsSL --retry 3 --retry-delay 10 --cacert /tmp/cadena.pem -o /tmp/amb.zip "$URL"
+          fi
           ls -la /tmp/amb.zip
           mkdir -p /tmp/gtfs
           unzip -o -q /tmp/amb.zip -d /tmp/gtfs
