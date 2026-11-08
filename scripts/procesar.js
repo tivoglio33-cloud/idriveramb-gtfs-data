@@ -339,6 +339,9 @@ async function main() {
   fs.writeFileSync(path.join(OUT_DIR, 'recorridos.gtfsdata'), JSON.stringify(salidaLineas));
   fs.writeFileSync(path.join(OUT_DIR, 'paradas.gtfsdata'), JSON.stringify(salidaParadas));
   fs.writeFileSync(path.join(OUT_DIR, 'meta.json'), JSON.stringify(meta, null, 1));
+  // Para el mapa (paradas de alrededor): [codigo, nombre, lon, lat, "lineas"]
+  fs.writeFileSync(path.join(OUT_DIR, 'paradas_todas.json'),
+    JSON.stringify(salidaParadas.map(p => [p.codi, p.nombre, p.lon, p.lat, p.lineas.join(',')])));
 
   const kb = f => Math.round(fs.statSync(path.join(OUT_DIR, f)).size / 1024) + ' KB';
   console.log('');
