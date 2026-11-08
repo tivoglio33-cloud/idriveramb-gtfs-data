@@ -1,0 +1,52 @@
+name: Avisos AMB
+
+# Cada hora (y a mano) baja los avisos en vivo del AMB (alerts.bin) y deja
+# datos/avisos.json para la app. Solo hace commit si han cambiado.
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7 * * * *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: actualizar-datos-amb
+  cancel-in-progress: false
+
+jobs:
+  avisos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Bajar avisos del AMB
+        run: |
+          set -e
+          npm i --no-save gtfs-realtime-bindings >/dev/null
+          HOST="www.ambmobilitat.cat"
+          URL="https://$HOST/transit/alerts/alerts.bin"
+          if ! curl -fsSL --retry 3 --retry-delay 10 -o /tmp/alerts.bin "$URL"; then
+            # El servidor del AMB no envía el certificado intermedio: se completa.
+            openssl s_client -connect "$HOST:443" -servername "$HOST" </dev/null 2>/dev/null | openssl x509 > /tmp/hoja.pem
+            AIA=$(openssl x509 -in /tmp/hoja.pem -noout -text | grep -o 'CA Issuers - URI:[^[:space:]]*' | head -1 | sed 's/.*URI://')
+            curl -fsSL -o /tmp/i.crt "$AIA"
+            openssl x509 -inform DER -in /tmp/i.crt -out /tmp/i.pem 2>/dev/null || cp /tmp/i.crt /tmp/i.pem
+            cat /etc/ssl/certs/ca-certificates.crt /tmp/i.pem > /tmp/cadena.pem
+            curl -fsSL --retry 3 --retry-delay 10 --cacert /tmp/cadena.pem -o /tmp/alerts.bin "$URL"
+          fi
+          node scripts/avisos.js /tmp/alerts.bin datos
+      - name: Guardar si hay cambios
+        run: |
+          git config user.name "idriveramb-bot"
+          git config user.email "idriveramb-bot@users.noreply.github.com"
+          git add datos/avisos.json
+          if git diff --cached --quiet; then
+            echo "Los avisos no han cambiado."
+          else
+            git commit -m "Avisos AMB $(TZ=Europe/Madrid date '+%d/%m/%Y %H:%M')"
+            git pull --rebase origin main
+            git push
+          fi
