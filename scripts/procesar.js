@@ -190,6 +190,13 @@ async function main() {
   }, false);
   console.log('  servicios con calendario: ' + Object.keys(fechasServicio).length);
 
+  // Solo nos interesan las fechas de hoy a 4 semanas vista (lo que usa la app)
+  const hoyMad = fechaMadrid().slice(0, 10).replace(/-/g, '');
+  const finVentana = aFecha(hoyMad); finVentana.setUTCDate(finVentana.getUTCDate() + 27);
+  const VENTANA_INI = hoyMad;
+  const VENTANA_FIN = deFecha(finVentana);
+  console.log('  ventana de fechas: ' + VENTANA_INI + ' - ' + VENTANA_FIN);
+
   // Etiqueta de dias a partir de los dias de la semana en que circula (0=domingo ... 6=sabado)
   function etiquetaDias(diasSemana) {
     const d = [...diasSemana].sort();
@@ -259,7 +266,9 @@ async function main() {
       operador: L.operador, sentidos: { '0': [], '1': [] },
     };
     const fechas = new Set();
-    for (const sid of g.servicios) for (const f of (fechasServicio[sid] || [])) fechas.add(f);
+    for (const sid of g.servicios) for (const f of (fechasServicio[sid] || [])) {
+      if (f >= VENTANA_INI && f <= VENTANA_FIN) fechas.add(f);
+    }
     out.sentidos[g.dir].push({ headsign, viajes: g.viajes, shape: g.shape || null, fechas, paradas: seq, puntos });
   }
 
@@ -284,6 +293,7 @@ async function main() {
         v.dias = [...diasSemana].sort();            // 0=domingo ... 6=sabado
         v.fechas = fechas;                          // fechas exactas que cubre el GTFS
         v.etiqueta = etiquetaDias(diasSemana);      // 'feiners', 'cap de setmana'... o null
+        v.activa = fechas.length > 0;               // false = no circula en las proximas 4 semanas
         // Recorrido claramente mas corto que el principal: (curta)
         v.curta = vars.length > 1 && v.paradas.length < maxParadas * 0.7;
       }
