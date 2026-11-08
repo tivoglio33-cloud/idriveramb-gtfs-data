@@ -1,0 +1,219 @@
+[
+ {
+  "id": "34",
+  "nombre": "Soler i Sauret",
+  "url": "http://www.ambmobilitat.cat",
+  "lineas": [
+   "EP1",
+   "EP2",
+   "ESC",
+   "JM",
+   "JT",
+   "MB1",
+   "MB2",
+   "MB3",
+   "PF1",
+   "PF2",
+   "SF1",
+   "SF2",
+   "SF3",
+   "SV1",
+   "SV2",
+   "SV3",
+   "SV4"
+  ]
+ },
+ {
+  "id": "37",
+  "nombre": "DIREXIS TGO",
+  "url": "http://www.ambmobilitat.cat",
+  "lineas": [
+   "CS1",
+   "CS2",
+   "CS3",
+   "CS4"
+  ]
+ },
+ {
+  "id": "44",
+  "nombre": "DIREXIS TUSGSAL",
+  "url": "http://www.ambmobilitat.cat",
+  "lineas": [
+   "B2",
+   "B3",
+   "B4",
+   "B5",
+   "B7",
+   "B8",
+   "B14",
+   "B15",
+   "B18",
+   "B20",
+   "B21",
+   "B23",
+   "B24",
+   "B25",
+   "B29",
+   "B31",
+   "B32",
+   "B80",
+   "B81",
+   "B82",
+   "M1",
+   "M6",
+   "M19",
+   "M26",
+   "M27",
+   "M28",
+   "M30",
+   "N0",
+   "N1",
+   "N2",
+   "N3",
+   "N4",
+   "N5",
+   "N6",
+   "N7",
+   "N8",
+   "N9",
+   "N11",
+   "N23",
+   "N24",
+   "N28"
+  ]
+ },
+ {
+  "id": "56",
+  "nombre": "Avanza",
+  "url": "http://www.ambmobilitat.cat",
+  "lineas": [
+   "CF1",
+   "CF2",
+   "GA1",
+   "GA2",
+   "L80",
+   "L82",
+   "L85",
+   "L86",
+   "L88",
+   "L94",
+   "L95",
+   "L96",
+   "L97",
+   "L99",
+   "N12",
+   "N13",
+   "N14",
+   "N15",
+   "N16",
+   "N17",
+   "N18",
+   "N19",
+   "N20",
+   "N21",
+   "VB1",
+   "VB2",
+   "VB3",
+   "VB4",
+   "X80",
+   "X83",
+   "X84",
+   "X86",
+   "X95",
+   "X97"
+  ]
+ },
+ {
+  "id": "62",
+  "nombre": "Monbus i Julià",
+  "url": "http://www.ambmobilitat.cat",
+  "lineas": [
+   "L46",
+   "L52",
+   "L70",
+   "L72",
+   "L74",
+   "L76",
+   "L77",
+   "L78",
+   "M5",
+   "M75",
+   "SB1",
+   "SB2",
+   "SB3",
+   "X43",
+   "X70",
+   "X73",
+   "X79"
+  ]
+ },
+ {
+  "id": "69",
+  "nombre": "Moventis",
+  "url": "http://www.ambmobilitat.cat",
+  "lineas": [
+   "L16",
+   "L20",
+   "L21",
+   "L22",
+   "LH1",
+   "LH2",
+   "M12",
+   "M14",
+   "M15",
+   "PR1",
+   "PR2",
+   "PR3",
+   "PR5",
+   "X30"
+  ]
+ },
+ {
+  "id": "71",
+  "nombre": "Monbus (Papiol)",
+  "url": "http://www.ambmobilitat.cat",
+  "lineas": [
+   "PA1",
+   "PA2"
+  ]
+ },
+ {
+  "id": "72",
+  "nombre": "Monbus (Aerobús)",
+  "url": "http://www.ambmobilitat.cat",
+  "lineas": [
+   "A1",
+   "A2"
+  ]
+ },
+ {
+  "id": "73",
+  "nombre": "Monbus (Horta)",
+  "url": "http://www.ambmobilitat.cat",
+  "lineas": [
+   "87"
+  ]
+ },
+ {
+  "id": "74",
+  "nombre": "Moventis (Port)",
+  "url": "http://www.ambmobilitat.cat",
+  "lineas": [
+   "88",
+   "89",
+   "PR4"
+  ]
+ },
+ {
+  "id": "79",
+  "nombre": "Moventis (Cerdanyola)",
+  "url": "http://www.ambmobilitat.cat",
+  "lineas": [
+   "CV1",
+   "CV2",
+   "CV3",
+   "CV4",
+   "CV5"
+  ]
+ }
+]
