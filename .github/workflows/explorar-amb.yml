@@ -68,3 +68,22 @@ jobs:
             code=$(curl -s --cacert /tmp/cadena.pem -o /tmp/r -w '%{http_code} %{size_download} %{content_type}' "https://www.ambmobilitat.cat/$u")
             echo "$code  <- $u"
           done
+      - name: Que trae alerts.bin
+        run: |
+          cd /tmp/d
+          curl -fsS --cacert /tmp/cadena.pem -o alerts.bin "https://www.ambmobilitat.cat/transit/alerts/alerts.bin"
+          cat > av.js <<'JS'
+          const G = require('gtfs-realtime-bindings').transit_realtime;
+          const o = G.FeedMessage.toObject(G.FeedMessage.decode(require('fs').readFileSync('alerts.bin')), { longs: String, enums: String });
+          console.log('AVISOS: total', o.entity.length);
+          const txt = (t) => (t?.translation || []).map(x => (x.language || '?') + ': ' + String(x.text).replace(/\s+/g, ' ').slice(0, 220)).join(' || ');
+          for (const e of o.entity.slice(0, 6)) {
+            const a = e.alert || {};
+            const rutas = (a.informedEntity || []).map(i => i.routeId || i.stopId || i.agencyId).filter(Boolean).slice(0, 8).join(',');
+            const per = (a.activePeriod || []).map(p => (p.start ? new Date(+p.start * 1000).toISOString().slice(0, 10) : '?') + '>' + (p.end ? new Date(+p.end * 1000).toISOString().slice(0, 10) : '?')).join(' ');
+            console.log('AVISO | ' + (a.effect || '') + ' | ' + per + ' | entidades: ' + rutas);
+            console.log('   TITULO ' + txt(a.headerText));
+            console.log('   TEXTO  ' + txt(a.descriptionText));
+          }
+          JS
+          node av.js
