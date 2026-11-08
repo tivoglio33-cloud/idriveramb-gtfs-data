@@ -159,14 +159,49 @@ async function main() {
     const k = t.route_id + '|' + dir + '|' + shape;
     let g = grupos[k];
     if (!g) {
-      g = grupos[k] = { route: t.route_id, dir, shape, viajes: 0, headsigns: {}, tripEjemplo: t.trip_id };
+      g = grupos[k] = { route: t.route_id, dir, shape, viajes: 0, headsigns: {}, tripEjemplo: t.trip_id, servicios: new Set() };
     }
     g.viajes++;
+    if (t.service_id) g.servicios.add(t.service_id);
     const h = t.trip_headsign || '';
     g.headsigns[h] = (g.headsigns[h] || 0) + 1;
     if (shape) shapesUsados.add(shape);
   });
   console.log('  grupos linea/sentido/recorrido: ' + Object.keys(grupos).length + (viajesSinShape ? ' (viajes sin shape: ' + viajesSinShape + ')' : ''));
+
+  // 3b) Calendario: que fechas circula cada servicio (calendar + calendar_dates)
+  const fechasServicio = {}; // service_id -> Set("YYYYMMDD")
+  const aFecha = s => new Date(Date.UTC(+s.slice(0, 4), +s.slice(4, 6) - 1, +s.slice(6, 8)));
+  const deFecha = d => d.toISOString().slice(0, 10).replace(/-/g, '');
+  const nombresDia = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'];
+  await leerCSV('calendar.txt', c => {
+    if (!c.start_date || !c.end_date) return;
+    const set = fechasServicio[c.service_id] = fechasServicio[c.service_id] || new Set();
+    const fin = aFecha(c.end_date);
+    let n = 0;
+    for (let d = aFecha(c.start_date); d <= fin && n < 1200; d.setUTCDate(d.getUTCDate() + 1), n++) {
+      if (c[nombresDia[d.getUTCDay()]] === '1') set.add(deFecha(d));
+    }
+  }, false);
+  await leerCSV('calendar_dates.txt', c => {
+    const set = fechasServicio[c.service_id] = fechasServicio[c.service_id] || new Set();
+    if (c.exception_type === '1') set.add(c.date);
+    else if (c.exception_type === '2') set.delete(c.date);
+  }, false);
+  console.log('  servicios con calendario: ' + Object.keys(fechasServicio).length);
+
+  // Etiqueta de dias a partir de los dias de la semana en que circula (0=domingo ... 6=sabado)
+  function etiquetaDias(diasSemana) {
+    const d = [...diasSemana].sort();
+    const s = new Set(d);
+    if (!d.length || d.length === 7) return null;           // todos los dias: sin etiqueta
+    if (d.every(x => x >= 1 && x <= 5)) return 'feiners';
+    if (d.length === 1 && d[0] === 6) return 'dissabtes';
+    if (d.length === 1 && d[0] === 0) return 'diumenges i festius';
+    if (d.every(x => x === 0 || x === 6)) return 'cap de setmana';
+    if (s.has(6) && !s.has(0) && d.length === 6) return 'feiners i dissabtes';
+    return null;
+  }
 
   // 4) Trazados (solo los que se usan)
   const shapes = {};
@@ -223,7 +258,9 @@ async function main() {
       codi: L.codi, nombre: L.nombre, color: L.color, colorTexto: L.colorTexto,
       operador: L.operador, sentidos: { '0': [], '1': [] },
     };
-    out.sentidos[g.dir].push({ headsign, viajes: g.viajes, shape: g.shape || null, paradas: seq, puntos });
+    const fechas = new Set();
+    for (const sid of g.servicios) for (const f of (fechasServicio[sid] || [])) fechas.add(f);
+    out.sentidos[g.dir].push({ headsign, viajes: g.viajes, shape: g.shape || null, fechas, paradas: seq, puntos });
   }
 
   // Ordenar variantes: la que mas viajes tiene primero (la principal).
@@ -234,10 +271,23 @@ async function main() {
       const porForma = {};
       for (const v of lista) {
         const firma = JSON.stringify(v.puntos);
-        if (porForma[firma]) porForma[firma].viajes += v.viajes;
-        else porForma[firma] = v;
+        if (porForma[firma]) {
+          porForma[firma].viajes += v.viajes;
+          for (const f of v.fechas) porForma[firma].fechas.add(f);
+        } else porForma[firma] = v;
       }
-      salidaLineas[id].sentidos[d] = Object.values(porForma).sort((a, b) => b.viajes - a.viajes);
+      const vars = Object.values(porForma).sort((a, b) => b.viajes - a.viajes);
+      const maxParadas = Math.max(0, ...vars.map(v => v.paradas.length));
+      for (const v of vars) {
+        const fechas = [...v.fechas].sort();
+        const diasSemana = new Set(fechas.map(f => aFecha(f).getUTCDay()));
+        v.dias = [...diasSemana].sort();            // 0=domingo ... 6=sabado
+        v.fechas = fechas;                          // fechas exactas que cubre el GTFS
+        v.etiqueta = etiquetaDias(diasSemana);      // 'feiners', 'cap de setmana'... o null
+        // Recorrido claramente mas corto que el principal: (curta)
+        v.curta = vars.length > 1 && v.paradas.length < maxParadas * 0.7;
+      }
+      salidaLineas[id].sentidos[d] = vars;
     }
   }
 
