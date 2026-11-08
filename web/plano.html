@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Plànol de línia · iDriverAMB</title>
+<!--
+  PLANO DE LA LÍNEA PEDIDO DESDE LA APP DEL MÓVIL (31/10/2026, 1.0.10)
+  El botón 🗺️ PDF de la app abre esta página con la línea empaquetada
+  detrás de "#" (recorrido, paradas, colores). Aquí se hace el PDF con el
+  mismo código que la web (plano-linea.js, generado de
+  src/utils/planoLinea.ts) y se ofrece Compartir / Descargar.
+  No pide código de acceso: solo dibuja lo que le manda la app.
+-->
+<style>
+  :root { color-scheme: dark; }
+  [hidden] { display: none !important; }
+  html, body { margin: 0; height: 100%; background: #121212; color: #fff; font-family: system-ui, -apple-system, Roboto, sans-serif; }
+  .caja { max-width: 380px; margin: 0 auto; padding: 40px 20px; text-align: center; }
+  img { width: 116px; height: auto; }
+  h1 { font-size: 22px; margin: 18px 0 6px; }
+  p { color: #ccc; font-size: 15px; line-height: 1.4; margin: 10px 0; }
+  button { display: block; width: 100%; margin-top: 14px; padding: 13px; border: 0; border-radius: 10px; color: #fff; font-size: 17px; font-weight: bold; }
+  #compartir { background: #2e7d32; }
+  #descargar { background: #1565c0; }
+  .barra { height: 6px; background: #333; border-radius: 3px; overflow: hidden; margin-top: 16px; }
+  .barra div { height: 100%; width: 0; background: #2e7d32; transition: width .3s; }
+</style>
+</head>
+<body>
+<div class="caja">
+  <img src="logo-plano.png" alt="iDriverAMB">
+  <h1 id="titulo"></h1>
+  <p id="estado"></p>
+  <div class="barra" id="barra"><div id="avance"></div></div>
+  <button id="compartir" hidden></button>
+  <button id="descargar" hidden></button>
+</div>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script type="module">
+  import { generarPlano, desempaquetarPlano, nombreArchivoPlano, TEXTOS_PLANO } from './plano-linea.js';
+
+  const $ = (id) => document.getElementById(id);
+  const datos = desempaquetarPlano(location.hash.slice(1));
+  const tx = TEXTOS_PLANO[datos?.idioma === 'es' ? 'es' : 'ca'];
+  document.documentElement.lang = datos?.idioma === 'es' ? 'es' : 'ca';
+
+  async function estilo() {
+    try {
+      const r = await fetch('https://tiles.openfreemap.org/styles/positron');
+      if (r.ok) return await r.json();
+    } catch (e) { /* plan B */ }
+    return {
+      version: 8,
+      sources: { fondo: { type: 'raster', tileSize: 256, maxzoom: 20,
+        tiles: ['a', 'b', 'c', 'd'].map((s) => `https://${s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png`) } },
+      layers: [{ id: 'fondo', type: 'raster', source: 'fondo' }],
+    };
+  }
+
+  async function empezar() {
+    if (!datos || (!datos.tramosIda.length && !datos.tramosVuelta.length)) {
+      $('titulo').textContent = 'iDriverAMB';
+      // Sin paquete (o cortado al copiar el enlace).
+      $('estado').textContent = location.hash.length > 1
+        ? (datos?.idioma === 'es' || /%22i%22%3A%22es/.test(location.hash) ? 'El enlace ha llegado incompleto. Vuelve a pulsar 🗺️ PDF en la app.' : "L'enllaç ha arribat incomplet. Torna a prémer 🗺️ PDF a l'app.")
+        : tx.sinLinea;
+      $('barra').hidden = true;
+      return;
+    }
+    $('titulo').textContent = `${tx.linea} ${datos.linea}`;
+    $('estado').textContent = tx.preparando;
+    try {
+      if (!window.maplibregl) throw new Error('MapLibre no ha cargado');
+      const blob = await generarPlano(window.maplibregl, await estilo(), datos, (hechas, total) => {
+        if (!total) return;
+        $('estado').textContent = `${tx.preparando} ${tx.trozo.replace('{n}', Math.min(hechas + 1, total)).replace('{total}', total)}`;
+        $('avance').style.width = `${Math.round((hechas / total) * 100)}%`;
+      });
+      const nombre = nombreArchivoPlano(datos.linea);
+      $('barra').hidden = true;
+      $('estado').textContent = tx.listoTexto;
+      $('titulo').textContent = `✅ ${tx.listo} · ${tx.linea} ${datos.linea}`;
+
+      const descargar = () => {
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = nombre;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      };
+      const archivo = new File([blob], nombre, { type: 'application/pdf' });
+      if (navigator.canShare?.({ files: [archivo] })) {
+        $('compartir').textContent = tx.compartir;
+        $('compartir').hidden = false;
+        $('compartir').onclick = async () => {
+          try { await navigator.share({ files: [archivo], title: `${tx.linea} ${datos.linea}` }); }
+          catch (e) { if (e?.name !== 'AbortError') descargar(); }
+        };
+      }
+      $('descargar').textContent = tx.descargar;
+      $('descargar').hidden = false;
+      $('descargar').onclick = descargar;
+    } catch (e) {
+      console.warn('No se pudo hacer el plano:', e);
+      $('barra').hidden = true;
+      $('estado').textContent = tx.error;
+    }
+  }
+  empezar();
+</script>
+</body>
+</html>
