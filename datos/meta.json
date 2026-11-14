@@ -1,12 +1,12 @@
 {
- "generado": "2026-11-13 10:44:40",
+ "generado": "2026-11-14 10:06:38",
  "fuente": "AMB - Àrea Metropolitana de Barcelona (GTFS de dades obertes)",
  "gtfs": {
-  "inicio": "20261113",
-  "fin": "20261118",
-  "version": "20261113"
+  "inicio": "20261114",
+  "fin": "20261119",
+  "version": "20261114"
  },
  "companias": 11,
  "lineas": 140,
- "paradas": 3581
+ "paradas": 3582
 }
