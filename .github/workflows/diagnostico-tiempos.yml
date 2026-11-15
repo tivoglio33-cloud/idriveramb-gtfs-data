@@ -25,6 +25,10 @@ jobs:
           openssl s_client -connect "$HOST:443" -servername "$HOST" </dev/null 2>/dev/null | openssl x509 -noout -subject -issuer -dates
           echo "== curl directo =="
           curl -sS -o /dev/null -w "%{http_code}\n" "https://$HOST/transit/trips-updates/trips.bin" || true
+          echo "== http (sin certificado) =="
+          curl -sS -o /tmp/h.bin -w "codigo %{http_code} · %{size_download} bytes · redirige a: %{redirect_url}\n" "http://$HOST/transit/trips-updates/trips.bin" || true
+          curl -sS -o /dev/null -w "alerts http: codigo %{http_code} · %{size_download} bytes\n" "http://$HOST/transit/alerts/alerts.bin" || true
+          curl -sS -o /dev/null -w "gtfs zip http: codigo %{http_code} · %{size_download} bytes\n" "http://$HOST/OpenData/google_transit.zip" || true
           echo "== DNS =="
           getent hosts $HOST || true
       - name: Preparar
