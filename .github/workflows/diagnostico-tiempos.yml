@@ -16,6 +16,17 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Certificado del AMB
+        run: |
+          HOST="www.ambmobilitat.cat"
+          echo "== Cadena que manda el servidor =="
+          openssl s_client -connect "$HOST:443" -servername "$HOST" -showcerts </dev/null 2>/dev/null | grep -E "^ ?[0-9] s:|i:|Verify return code"
+          echo "== Hoja =="
+          openssl s_client -connect "$HOST:443" -servername "$HOST" </dev/null 2>/dev/null | openssl x509 -noout -subject -issuer -dates
+          echo "== curl directo =="
+          curl -sS -o /dev/null -w "%{http_code}\n" "https://$HOST/transit/trips-updates/trips.bin" || true
+          echo "== DNS =="
+          getent hosts $HOST || true
       - name: Preparar
         run: |
           mkdir -p /tmp/d && cd /tmp/d && npm init -y >/dev/null && npm i gtfs-realtime-bindings >/dev/null
