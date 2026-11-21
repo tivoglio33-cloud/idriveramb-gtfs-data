@@ -149,7 +149,7 @@
  },
  {
   "id": "69",
-  "nombre": "Moventis",
+  "nombre": "Moventis (Sagalés)",
   "url": "http://www.ambmobilitat.cat",
   "lineas": [
    "L16",
@@ -196,7 +196,7 @@
  },
  {
   "id": "74",
-  "nombre": "Moventis (Port)",
+  "nombre": "Moventis Port (Sagalés)",
   "url": "http://www.ambmobilitat.cat",
   "lineas": [
    "88",
@@ -206,7 +206,7 @@
  },
  {
   "id": "79",
-  "nombre": "Moventis (Cerdanyola)",
+  "nombre": "Moventis Cerdanyola (Sagalés)",
   "url": "http://www.ambmobilitat.cat",
   "lineas": [
    "CV1",
