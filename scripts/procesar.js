@@ -118,6 +118,16 @@ function fechaMadrid() {
 // ---------------------------------------------------------------------------
 // Proceso principal
 // ---------------------------------------------------------------------------
+// Nombres como los conocen los conductores (21/11/2026, pedido por Alberto):
+// Moventis es la marca de Sagalés y la gente la busca como "Sagalés".
+// Se cambia aquí, en los datos, para que llegue a la app sin fabricar otra.
+function nombreVisible(nombre) {
+  const n = String(nombre).trim();
+  const m = n.match(/^Moventis(?:\s*\((.+)\))?$/i);
+  if (m) return m[1] ? `Moventis ${m[1]} (Sagalés)` : 'Moventis (Sagalés)';
+  return n;
+}
+
 async function main() {
   console.log('Procesando GTFS de ' + GTFS_DIR);
   fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -126,7 +136,7 @@ async function main() {
   const agencias = {};
   await leerCSV('agency.txt', a => {
     const id = a.agency_id || 'AMB';
-    agencias[id] = { id, nombre: a.agency_name || id, url: a.agency_url || '' };
+    agencias[id] = { id, nombre: nombreVisible(a.agency_name || id), url: a.agency_url || '' };
   });
   console.log('  companias: ' + Object.keys(agencias).length);
 
